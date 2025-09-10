@@ -3,7 +3,7 @@ use std::{
     time::Instant,
 };
 
-use speedtest_rs::{Humanize, speed_tester::SpeedTester};
+use speedtest_rs_core::{Humanize, speed_tester::SpeedTester};
 
 #[tokio::main]
 pub async fn main() {

@@ -59,6 +59,27 @@ impl SpeedTester {
         Self::new(client)
     }
 
+    pub fn with_url(mut self, urls: SpeedTestUrl) -> Self {
+        self.urls = urls;
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.request_timeout = timeout;
+        self
+    }
+
+    pub fn with_compare(mut self, times: usize, interval: Duration) -> Self {
+        self.compare_times = times;
+        self.compare_interval = interval;
+        self
+    }
+
+    pub fn with_client(mut self, client: reqwest::Client) -> Self {
+        self.client = client;
+        self
+    }
+
     pub async fn initialize(&mut self) -> anyhow::Result<()> {
         if self.config.is_some() && self.server.is_some() {
             tracing::debug!("SpeedTester already initialized.");
