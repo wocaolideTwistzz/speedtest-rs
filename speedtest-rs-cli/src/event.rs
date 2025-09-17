@@ -5,10 +5,10 @@ use speedtest_rs_core::model::Server;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use crate::app::fetch_config::SimpleConfig;
+use crate::app::SimpleConfig;
 
 /// The frequency at which tick events are emitted.
-const TICK_FPS: f64 = 30.0;
+const TICK_FPS: f64 = 10.0;
 
 /// Representation of all possible events.
 #[derive(Clone, Debug)]
@@ -44,52 +44,28 @@ pub enum AppEvent {
 #[derive(Clone, Debug)]
 pub enum State {
     /// Step1. Fetch config
-    FetchConfig(FetchConfigState),
+    FetchConfig(Status<SimpleConfig>),
 
     /// Step2. Fetch servers
-    FetchServers(FetchServersState),
+    FetchServers(Status<Vec<Server>>),
 
-    /// Step3. Select fastest server
-    SelectFastestServer(SelectFastestServerState),
+    /// Step3. Racing fastest server
+    RacingServers(Status<Server>),
 
     /// Step4. Download
-    Download(DownloadState),
+    Download(Status<()>),
 
     /// Step5. Upload
-    Upload(UploadState),
-}
-
-#[derive(Clone, Debug)]
-pub enum FetchConfigState {
-    Start,
-    Success(SimpleConfig),
-    Failed(String),
+    Upload(Status<()>),
 }
 
 #[derive(Debug, Clone)]
-pub enum FetchServersState {
+pub enum Status<T> {
+    Pending,
     Start,
-    Success(Vec<Server>),
-    Failed(String),
-}
-
-#[derive(Clone, Debug)]
-pub enum SelectFastestServerState {
-    Start,
-    Success(Server),
-    Failed(String),
-}
-
-#[derive(Debug, Clone)]
-pub enum DownloadState {
-    Start,
-    Done,
-}
-
-#[derive(Debug, Clone)]
-pub enum UploadState {
-    Start,
-    Done,
+    Ok(T),
+    Err(String),
+    Canceled,
 }
 
 /// Terminal event handler.
@@ -197,79 +173,45 @@ impl State {
     pub fn is_error(&self) -> bool {
         matches!(
             self,
-            State::FetchConfig(FetchConfigState::Failed(_))
-                | State::FetchServers(FetchServersState::Failed(_))
-                | State::SelectFastestServer(SelectFastestServerState::Failed(_))
+            State::FetchConfig(Status::Err(_))
+                | State::FetchServers(Status::Err(_))
+                | State::RacingServers(Status::Err(_))
+                | State::Download(Status::Err(_))
+                | State::Upload(Status::Err(_))
         )
     }
 
-    pub fn is_done(&self) -> bool {
-        false
-    }
-}
-
-impl AppEvent {
-    pub fn start_fetch_config() -> Event {
-        Self::SetState(State::FetchConfig(FetchConfigState::Start)).into()
-    }
-
-    pub fn fetch_config_success(config: SimpleConfig) -> Event {
-        Self::SetState(State::FetchConfig(FetchConfigState::Success(config))).into()
-    }
-
-    pub fn fetch_config_failed(error: String) -> Event {
-        Self::SetState(State::FetchConfig(FetchConfigState::Failed(error))).into()
-    }
-
-    pub fn start_fetch_servers() -> Event {
-        Self::SetState(State::FetchServers(FetchServersState::Start)).into()
-    }
-
-    pub fn fetch_servers_success(servers: Vec<Server>) -> Event {
-        Self::SetState(State::FetchServers(FetchServersState::Success(servers))).into()
-    }
-
-    pub fn fetch_servers_failed(error: String) -> Event {
-        Self::SetState(State::FetchServers(FetchServersState::Failed(error))).into()
-    }
-
-    pub fn start_select_fastest_server() -> Event {
-        Self::SetState(State::SelectFastestServer(SelectFastestServerState::Start)).into()
-    }
-
-    pub fn select_fastest_server_success(server: Server) -> Event {
-        Self::SetState(State::SelectFastestServer(
-            SelectFastestServerState::Success(server),
-        ))
-        .into()
-    }
-
-    pub fn select_fastest_server_failed(error: String) -> Event {
-        Self::SetState(State::SelectFastestServer(
-            SelectFastestServerState::Failed(error),
-        ))
-        .into()
-    }
-
-    pub fn start_download() -> Event {
-        Self::SetState(State::Download(DownloadState::Start)).into()
-    }
-
-    pub fn download_done() -> Event {
-        Self::SetState(State::Download(DownloadState::Done)).into()
-    }
-
-    pub fn start_upload() -> Event {
-        Self::SetState(State::Upload(UploadState::Start)).into()
-    }
-
-    pub fn upload_done() -> Event {
-        Self::SetState(State::Upload(UploadState::Done)).into()
+    pub fn cancel_after(&self) -> Vec<State> {
+        match self {
+            Self::FetchConfig(_) => vec![
+                State::FetchServers(Status::Canceled),
+                State::RacingServers(Status::Canceled),
+                State::Download(Status::Canceled),
+                State::Upload(Status::Canceled),
+            ],
+            Self::FetchServers(_) => vec![
+                State::RacingServers(Status::Canceled),
+                State::Download(Status::Canceled),
+                State::Upload(Status::Canceled),
+            ],
+            Self::RacingServers(_) => vec![
+                State::Download(Status::Canceled),
+                State::Upload(Status::Canceled),
+            ],
+            Self::Download(_) => vec![State::Upload(Status::Canceled)],
+            _ => vec![],
+        }
     }
 }
 
 impl From<AppEvent> for Event {
     fn from(app_event: AppEvent) -> Self {
         Event::App(app_event)
+    }
+}
+
+impl From<State> for Event {
+    fn from(value: State) -> Self {
+        Event::App(AppEvent::SetState(value))
     }
 }

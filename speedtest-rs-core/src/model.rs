@@ -243,6 +243,12 @@ mod tests {
         println!("{:#?}", setting.download_size_sequence());
 
         println!("{:#?}", setting.upload_size_sequence());
+
+        println!(
+            "{:#?} -> {:#?}",
+            setting.max_upload_count(),
+            setting.max_upload_duration()
+        );
     }
 
     #[test]

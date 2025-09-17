@@ -18,6 +18,8 @@ pub trait Humanize {
     fn humanize_bytes(&self) -> String;
 
     fn humanize_bitrate(&self, duration_millis: u64) -> String;
+
+    fn humanize(&self) -> (f64, usize);
 }
 
 impl Humanize for usize {
@@ -53,6 +55,21 @@ impl Humanize for usize {
             format!("{:.2} Gbits/sec", rate / G_BITS_PER_SEC as f64)
         } else {
             format!("{:.2} Tbits/sec", rate / T_BITS_PER_SEC as f64)
+        }
+    }
+
+    fn humanize(&self) -> (f64, usize) {
+        let bytes = *self;
+        if bytes < KB {
+            (bytes as f64, 1)
+        } else if bytes < MB {
+            (bytes as f64 / KB as f64, KB)
+        } else if bytes < GB {
+            (bytes as f64 / MB as f64, MB)
+        } else if bytes < TB {
+            (bytes as f64 / GB as f64, GB)
+        } else {
+            (bytes as f64 / TB as f64, TB)
         }
     }
 }

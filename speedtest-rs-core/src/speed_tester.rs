@@ -33,7 +33,12 @@ pub struct SpeedTester {
 
 impl Default for SpeedTester {
     fn default() -> Self {
-        Self::new(reqwest::Client::default())
+        Self::new(
+            reqwest::ClientBuilder::new()
+                .user_agent("SPEED-TESTER-RS")
+                .build()
+                .expect("build client failed"),
+        )
     }
 }
 
@@ -53,6 +58,7 @@ impl SpeedTester {
     pub fn new_with_local_addr(local_addr: IpAddr) -> Self {
         let client = reqwest::Client::builder()
             .local_address(local_addr)
+            .user_agent("SPEED-TESTER-RS")
             .build()
             .unwrap();
 
@@ -331,12 +337,7 @@ impl SpeedTester {
         downloaded: Arc<AtomicU64>,
         mut shutdown: tokio::sync::watch::Receiver<bool>,
     ) {
-        let mut resp = match client
-            .get(&url)
-            .header("user-agent", "SPEED-TESTER-RS")
-            .send()
-            .await
-        {
+        let mut resp = match client.get(&url).send().await {
             Ok(resp) => resp,
             Err(e) => {
                 tracing::debug!("download {} failed: {}", url, e);
@@ -373,7 +374,8 @@ impl SpeedTester {
                 .post(url)
                 .body(reqwest::Body::wrap_stream(body))
                 .header(CONTENT_LENGTH, size)
-                .send() => {}
+                .send() => {
+                }
         }
         // client.post(url).body(body)
     }
